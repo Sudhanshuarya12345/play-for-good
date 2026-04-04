@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import dns from "node:dns/promises";
 import { APP_CONSTANTS } from "../constants/app.js";
 import { env } from "../config/env.js";
 import { getSupabaseAdminClient, getSupabaseAnonClient } from "../supabase/client.js";
@@ -32,6 +33,20 @@ router.post("/signup", async (req, res) => {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) {
       return badRequest(res, "Invalid signup payload", parsed.error.flatten());
+    }
+
+    const domain = parsed.data.email.split("@")[1];
+    if (!domain) {
+      return badRequest(res, "Invalid email domain");
+    }
+
+    try {
+      const records = await dns.resolveMx(domain);
+      if (!records || records.length === 0) {
+        return badRequest(res, "Invalid email address (domain does not accept emails).");
+      }
+    } catch (dnsError) {
+      return badRequest(res, "Invalid email address (domain does not exist or rejects mail).");
     }
 
     const adminClient = getSupabaseAdminClient();

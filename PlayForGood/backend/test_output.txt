@@ -1,0 +1,63 @@
+┌─────────┬───────────────────────────────────────────────────┬────────┬──────────┬───────┬──────────────────────────────────────────────────────────────────┐
+│ (index) │ name                                              │ status │ expected │ ok    │ error                                                            │
+├─────────┼───────────────────────────────────────────────────┼────────┼──────────┼───────┼──────────────────────────────────────────────────────────────────┤
+│ 0       │ 'GET /health'                                     │ 200    │ '200'    │ true  │ ''                                                               │
+│ 1       │ 'GET /api/public/home'                            │ 200    │ '200'    │ true  │ ''                                                               │
+│ 2       │ 'GET /api/charities'                              │ 200    │ '200'    │ true  │ ''                                                               │
+│ 3       │ 'GET /api/charities/:slug'                        │ 200    │ '200'    │ true  │ ''                                                               │
+│ 4       │ 'POST /api/auth/signup'                           │ 201    │ '201'    │ true  │ ''                                                               │
+│ 5       │ 'GET /api/draws'                                  │ 200    │ '200'    │ true  │ ''                                                               │
+│ 6       │ 'GET /api/draws/:id'                              │ 200    │ '200'    │ true  │ ''                                                               │
+│ 7       │ 'POST /api/auth/login (user)'                     │ 200    │ '200'    │ true  │ ''                                                               │
+│ 8       │ 'POST /api/auth/login (admin)'                    │ 200    │ '200'    │ true  │ ''                                                               │
+│ 9       │ 'GET /api/auth/me (user)'                         │ 200    │ '200'    │ true  │ ''                                                               │
+│ 10      │ 'GET /api/auth/me (admin)'                        │ 200    │ '200'    │ true  │ ''                                                               │
+│ 11      │ 'GET /api/user/charity'                           │ 200    │ '200'    │ true  │ ''                                                               │
+│ 12      │ 'PATCH /api/user/charity'                         │ 200    │ '200'    │ true  │ ''                                                               │
+│ 13      │ 'POST /api/donations'                             │ 201    │ '201'    │ true  │ ''                                                               │
+│ 14      │ 'GET /api/donations'                              │ 200    │ '200'    │ true  │ ''                                                               │
+│ 15      │ 'GET /api/donations/me'                           │ 200    │ '200'    │ true  │ ''                                                               │
+│ 16      │ 'GET /api/subscriptions/status'                   │ 200    │ '200'    │ true  │ ''                                                               │
+│ 17      │ 'POST /api/subscriptions/create-checkout-session' │ 500    │ '400'    │ false │ 'Unexpected server error'                                        │
+│ 18      │ 'POST /api/subscriptions/create-portal-session'   │ 400    │ '400'    │ true  │ ''                                                               │
+│ 19      │ 'POST /api/subscriptions/cancel'                  │ 400    │ '400'    │ true  │ ''                                                               │
+│ 20      │ 'PATCH /api/admin/users/:id/subscription'         │ 200    │ '200'    │ true  │ ''                                                               │
+│ 21      │ 'POST /api/scores [11]'                           │ 201    │ '201'    │ true  │ ''                                                               │
+│ 22      │ 'POST /api/scores [12]'                           │ 201    │ '201'    │ true  │ ''                                                               │
+│ 23      │ 'POST /api/scores [13]'                           │ 201    │ '201'    │ true  │ ''                                                               │
+│ 24      │ 'POST /api/scores [14]'                           │ 201    │ '201'    │ true  │ ''                                                               │
+│ 25      │ 'POST /api/scores [15]'                           │ 201    │ '201'    │ true  │ ''                                                               │
+│ 26      │ 'GET /api/scores'                                 │ 200    │ '200'    │ true  │ ''                                                               │
+│ 27      │ 'PATCH /api/scores/:id'                           │ 200    │ '200'    │ true  │ ''                                                               │
+│ 28      │ 'GET /api/admin/users'                            │ 200    │ '200'    │ true  │ ''                                                               │
+│ 29      │ 'PATCH /api/admin/users/:id'                      │ 200    │ '200'    │ true  │ ''                                                               │
+│ 30      │ 'GET /api/admin/charities'                        │ 200    │ '200'    │ true  │ ''                                                               │
+│ 31      │ 'POST /api/admin/charities'                       │ 201    │ '201'    │ true  │ ''                                                               │
+│ 32      │ 'PATCH /api/admin/charities/:id'                  │ 200    │ '200'    │ true  │ ''                                                               │
+│ 33      │ 'DELETE /api/admin/charities/:id'                 │ 200    │ '200'    │ true  │ ''                                                               │
+│ 34      │ 'GET /api/admin/draw/config'                      │ 200    │ '200'    │ true  │ ''                                                               │
+│ 35      │ 'PATCH /api/admin/draw/config'                    │ 200    │ '200'    │ true  │ ''                                                               │
+│ 36      │ 'POST /api/admin/draw/simulate'                   │ 200    │ '200'    │ true  │ ''                                                               │
+│ 37      │ 'POST /api/admin/draw/publish'                    │ 200    │ '200'    │ true  │ ''                                                               │
+│ 38      │ 'GET /api/draws (post-publish)'                   │ 200    │ '200'    │ true  │ ''                                                               │
+│ 39      │ 'GET /api/draws/:id (user personal result)'       │ 200    │ '200'    │ true  │ ''                                                               │
+│ 40      │ 'GET /api/winnings/me'                            │ 200    │ '200'    │ true  │ ''                                                               │
+│ 41      │ 'POST /api/winnings/:id/proof/upload-url'         │ 200    │ '200'    │ true  │ ''                                                               │
+│ 42      │ 'POST /api/winnings/:id/proof/submit'             │ 200    │ '200'    │ true  │ ''                                                               │
+│ 43      │ 'GET /api/admin/winnings'                         │ 200    │ '200'    │ true  │ ''                                                               │
+│ 44      │ 'PATCH /api/admin/winnings/:id/verification'      │ 200    │ '200'    │ true  │ ''                                                               │
+│ 45      │ 'PATCH /api/admin/winnings/:id/payment'           │ 200    │ '200'    │ true  │ ''                                                               │
+│ 46      │ 'GET /api/admin/reports/overview'                 │ 200    │ '200'    │ true  │ ''                                                               │
+│ 47      │ 'POST /api/webhooks/razorpay'                     │ 400    │ '200'    │ false │ '{"success":false,"error":"Missing Razorpay webhook signature"}' │
+│ 48      │ 'POST /api/webhooks/stripe (deprecated)'          │ 200    │ '200'    │ true  │ ''                                                               │
+│ 49      │ 'POST /api/auth/logout'                           │ 200    │ '200'    │ true  │ ''                                                               │
+└─────────┴───────────────────────────────────────────────────┴────────┴──────────┴───────┴──────────────────────────────────────────────────────────────────┘
+TOTAL=50
+FAILED=2
+FAILED_CASES
+┌─────────┬───────────────────────────────────────────────────┬────────┬──────────┬───────┬──────────────────────────────────────────────────────────────────┐
+│ (index) │ name                                              │ status │ expected │ ok    │ error                                                            │
+├─────────┼───────────────────────────────────────────────────┼────────┼──────────┼───────┼──────────────────────────────────────────────────────────────────┤
+│ 0       │ 'POST /api/subscriptions/create-checkout-session' │ 500    │ '400'    │ false │ 'Unexpected server error'                                        │
+│ 1       │ 'POST /api/webhooks/razorpay'                     │ 400    │ '200'    │ false │ '{"success":false,"error":"Missing Razorpay webhook signature"}' │
+└─────────┴───────────────────────────────────────────────────┴────────┴──────────┴───────┴──────────────────────────────────────────────────────────────────┘
