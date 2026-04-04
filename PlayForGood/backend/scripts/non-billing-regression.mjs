@@ -43,12 +43,13 @@ async function request(method, path, options = {}) {
 }
 
 function buildFutureMonth(existingMonths) {
-  for (let year = 2099; year <= 2120; year += 1) {
-    for (let month = 1; month <= 12; month += 1) {
-      const value = `${year}-${String(month).padStart(2, "0")}`;
-      if (!existingMonths.has(value)) {
-        return value;
-      }
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    const year = 3000 + Math.floor(Math.random() * 6000);
+    const month = 1 + Math.floor(Math.random() * 12);
+    const value = `${year}-${String(month).padStart(2, "0")}`;
+
+    if (!existingMonths.has(value)) {
+      return value;
     }
   }
 
@@ -295,15 +296,32 @@ async function run() {
   });
   addResult("POST /api/admin/draw/simulate", drawSimulate, 200);
 
-  const drawPublish = await request("POST", "/api/admin/draw/publish", {
-    token: adminToken,
-    body: {
-      drawMonth,
-      mode: "random",
-      weightedStrategy: "hot",
-      numbers: [11, 12, 13, 14, 15]
+  let drawPublish = null;
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    drawPublish = await request("POST", "/api/admin/draw/publish", {
+      token: adminToken,
+      body: {
+        drawMonth,
+        mode: "random",
+        weightedStrategy: "hot",
+        numbers: [11, 12, 13, 14, 15]
+      }
+    });
+
+    if (drawPublish.status === 200) {
+      break;
     }
-  });
+
+    const publishMessage = drawPublish.json?.error?.message || drawPublish.text || "";
+    if (!/already exists/i.test(String(publishMessage))) {
+      break;
+    }
+
+    existingMonths.add(drawMonth);
+    drawMonth = buildFutureMonth(existingMonths);
+  }
+
   addResult("POST /api/admin/draw/publish", drawPublish, 200);
   const drawId = drawPublish.json?.data?.draw?.id;
 

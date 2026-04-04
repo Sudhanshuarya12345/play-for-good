@@ -3,14 +3,21 @@ import { apiRequest } from "../../lib/api";
 
 export default function WinningsPage() {
   const [rows, setRows] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [uploadingId, setUploadingId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   async function loadRows() {
     try {
-      const data = await apiRequest("/winnings/me", { method: "GET" });
-      setRows(data.items || []);
+      setError("");
+      const [winningsData, participationData] = await Promise.all([
+        apiRequest("/winnings/me", { method: "GET" }),
+        apiRequest("/user/participation-summary", { method: "GET" }).catch(() => null)
+      ]);
+
+      setRows(winningsData.items || []);
+      setSummary(participationData);
     } catch (loadError) {
       setError(loadError.message || "Unable to load winnings");
     }
@@ -89,7 +96,13 @@ export default function WinningsPage() {
           </article>
         ))}
 
-        {!rows.length ? <p className="text-sm text-slate-400">No winnings found.</p> : null}
+        {!rows.length ? (
+          <p className="text-sm text-slate-400">
+            {summary?.drawsEntered
+              ? `No tier wins yet. You have participated in ${summary.drawsEntered} draw(s). Upcoming draw: ${summary.upcomingDrawMonth || "-"}.`
+              : "No winnings found yet. Enter your latest scores and stay active to join draws."}
+          </p>
+        ) : null}
       </section>
 
       {message ? <p className="mt-4 text-sm text-success">{message}</p> : null}

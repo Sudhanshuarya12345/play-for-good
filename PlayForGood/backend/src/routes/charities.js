@@ -4,14 +4,36 @@ import { ok, badRequest, serverError } from "../http/responses.js";
 
 const router = Router();
 
+function parseOptionalBoolean(value) {
+  if (typeof value === "undefined") {
+    return null;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return null;
+}
+
 router.get("/", async (req, res) => {
   try {
     const query = String(req.query.query || "").trim();
     const page = Number(req.query.page || 1);
     const pageSize = Math.min(Number(req.query.pageSize || 12), 24);
+    const featured = parseOptionalBoolean(req.query.featured);
 
     if (page < 1 || pageSize < 1) {
       return badRequest(res, "Invalid pagination params");
+    }
+
+    if (typeof req.query.featured !== "undefined" && featured === null) {
+      return badRequest(res, "Invalid featured filter. Use true or false.");
     }
 
     const from = (page - 1) * pageSize;
@@ -30,6 +52,10 @@ router.get("/", async (req, res) => {
       dbQuery = dbQuery.or(`name.ilike.%${query}%,short_description.ilike.%${query}%`);
     }
 
+    if (featured !== null) {
+      dbQuery = dbQuery.eq("is_featured", featured);
+    }
+
     const { data, count, error } = await dbQuery;
 
     if (error) {
@@ -40,7 +66,11 @@ router.get("/", async (req, res) => {
       items: data || [],
       page,
       pageSize,
-      total: count || 0
+      total: count || 0,
+      filters: {
+        query,
+        featured
+      }
     });
   } catch (error) {
     return serverError(res, error.message);

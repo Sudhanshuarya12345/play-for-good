@@ -159,6 +159,16 @@ export default function AdminUsersPage() {
       return;
     }
 
+    if (subscriptionDraft.status === "active" && new Date(currentPeriodEnd).getTime() <= Date.now()) {
+      setError("Active subscriptions must have a future period end date.");
+      return;
+    }
+
+    if (subscriptionDraft.cancelAtPeriodEnd && subscriptionDraft.status !== "active") {
+      setError("Cancel at period end can only be enabled when status is active.");
+      return;
+    }
+
     try {
       setSavingSubscriptionUserId(userId);
       setMessage("");
@@ -402,6 +412,10 @@ export default function AdminUsersPage() {
                     />
                     Cancel At Period End
                   </label>
+
+                  <p className="mt-2 text-xs text-slate-400">
+                    Validation guard: active status requires a future period end date.
+                  </p>
 
                   <div className="mt-3 flex gap-2">
                     <button

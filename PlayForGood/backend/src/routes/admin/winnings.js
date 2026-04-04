@@ -1,7 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
+import { env } from "../../config/env.js";
 import { getSupabaseAdminClient } from "../../supabase/client.js";
-import { sendTransactionalEmail } from "../../services/email.js";
+import {
+  buildPayoutCompletedEmailHtml,
+  buildVerificationDecisionEmailHtml,
+  sendTransactionalEmail
+} from "../../services/email.js";
 import { requireAdmin } from "../../middleware/auth.js";
 import { ok, badRequest, serverError } from "../../http/responses.js";
 
@@ -61,7 +66,10 @@ router.patch("/:id/verification", requireAdmin, async (req, res) => {
       await sendTransactionalEmail({
         to: profile.email,
         subject: `Winner Verification ${parsed.data.decision.toUpperCase()}`,
-        html: `<p>Your winner verification request has been ${parsed.data.decision}.</p>`
+        html: buildVerificationDecisionEmailHtml({
+          decision: parsed.data.decision,
+          dashboardUrl: `${env.APP_URL.replace(/\/$/, "")}/dashboard/winnings`
+        })
       });
     }
 
@@ -113,7 +121,9 @@ router.patch("/:id/payment", requireAdmin, async (req, res) => {
         await sendTransactionalEmail({
           to: profile.email,
           subject: "Prize Payout Completed",
-          html: "<p>Your prize payout status is now marked as paid.</p>"
+          html: buildPayoutCompletedEmailHtml({
+            dashboardUrl: `${env.APP_URL.replace(/\/$/, "")}/dashboard/winnings`
+          })
         });
       }
     }
