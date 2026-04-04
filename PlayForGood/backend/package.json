@@ -1,0 +1,37 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "PlayForGood Express backend",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "seed:demo": "node scripts/seed-demo-users.mjs",
+    "db:apply:remote": "node scripts/apply-schema-remote.mjs",
+    "test:nonbilling": "node scripts/non-billing-regression.mjs",
+    "test:nonstripe": "node scripts/non-billing-regression.mjs",
+    "lint": "echo \"Backend lint rules can be added in next iteration\"",
+    "test": "echo \"Backend tests pending migration completion\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.2",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
+    "razorpay": "^2.9.6",
+    "resend": "^6.10.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "eslint": "^10.1.0",
+    "nodemon": "^3.1.14"
+  }
+}
