@@ -236,3 +236,32 @@ Representative additions in this run:
 
 Result:
 - Full endpoint verification passed (`50/50`).
+
+## PRD Hardening Validation Snapshot
+
+Timestamp: 2026-04-04 19:29:37 +05:30
+
+Summary:
+- Applied delivery hardening across notifications, dashboard participation visibility, charity discovery UX, admin analytics, and validation guards.
+- Frontend quality gates passed after UI updates (lint + production build).
+- Backend non-billing regression rerun passed after making draw-month selection collision-safe in regression automation.
+- Total endpoint checks: 50
+- Failed checks: 0
+
+Representative checks:
+
+| Method | Endpoint | Status |
+|---|---|---|
+| GET | /api/charities | 200 |
+| GET | /api/charities/:slug | 200 |
+| GET | /api/user/charity | 200 |
+| PATCH | /api/admin/users/:id/subscription | 200 |
+| GET | /api/admin/reports/overview | 200 |
+| POST | /api/admin/draw/publish | 200 |
+| GET | /api/winnings/me | 200 |
+| PATCH | /api/admin/winnings/:id/verification | 200 |
+| PATCH | /api/admin/winnings/:id/payment | 200 |
+| POST | /api/webhooks/razorpay | 200 |
+
+Result:
+- Full endpoint verification passed (`50/50`).

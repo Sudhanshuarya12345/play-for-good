@@ -24,10 +24,14 @@ export default function AdminOverviewPage() {
 
       {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
 
-      <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <article className="glass rounded-xl p-4">
           <p className="text-xs uppercase tracking-wider text-neonSoft">Users</p>
           <p className="mt-2 text-2xl font-bold">{overview?.totalUsers || 0}</p>
+        </article>
+        <article className="glass rounded-xl p-4">
+          <p className="text-xs uppercase tracking-wider text-neonSoft">Active Subscribers</p>
+          <p className="mt-2 text-2xl font-bold">{overview?.activeSubscribers || 0}</p>
         </article>
         <article className="glass rounded-xl p-4">
           <p className="text-xs uppercase tracking-wider text-neonSoft">Draws</p>
@@ -44,6 +48,18 @@ export default function AdminOverviewPage() {
         <article className="glass rounded-xl p-4">
           <p className="text-xs uppercase tracking-wider text-neonSoft">Paid Out</p>
           <p className="mt-2 text-2xl font-bold">INR {((overview?.totalPaidOutPaise || 0) / 100).toFixed(2)}</p>
+        </article>
+        <article className="glass rounded-xl p-4">
+          <p className="text-xs uppercase tracking-wider text-neonSoft">Pending Verification</p>
+          <p className="mt-2 text-2xl font-bold">{overview?.pendingVerificationCount || 0}</p>
+        </article>
+        <article className="glass rounded-xl p-4">
+          <p className="text-xs uppercase tracking-wider text-neonSoft">Pending Payout</p>
+          <p className="mt-2 text-2xl font-bold">{overview?.pendingPayoutCount || 0}</p>
+        </article>
+        <article className="glass rounded-xl p-4">
+          <p className="text-xs uppercase tracking-wider text-neonSoft">Unsettled Jackpot</p>
+          <p className="mt-2 text-2xl font-bold">INR {((overview?.unsettledRolloverPaise || 0) / 100).toFixed(2)}</p>
         </article>
       </section>
 

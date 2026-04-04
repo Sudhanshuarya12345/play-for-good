@@ -24,6 +24,7 @@ import adminWinningsRoutes from "./routes/admin/winnings.js";
 import adminReportsRoutes from "./routes/admin/reports.js";
 
 const app = express();
+app.set("trust proxy", 1);
 
 function normalizeOrigin(value) {
   return String(value || "").trim().replace(/\/+$/, "");

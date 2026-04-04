@@ -1,6 +1,6 @@
 # Golf Charity Subscription Platform - Implementation Tracker
 
-Last Updated: 2026-04-04 16:46:41 +05:30
+Last Updated: 2026-04-04 19:29:37 +05:30
 Status: In Progress
 
 ## Delivery Goal
@@ -188,6 +188,11 @@ Build a complete, deployable web application using plain React.js + JavaScript f
 - 2026-04-04 16:40:55 +05:30: Completed logical webhook-readiness audit and fixed two risks: removed immediate-cancel fallback (now explicit cycle-end cancel only) and strengthened Razorpay webhook idempotency/signature handling using `x-razorpay-event-id` preference and hex-safe signature comparison.
 - 2026-04-04 16:42:41 +05:30: Added `payment.failed` webhook sync to fetch and upsert linked Razorpay subscription status; reran full non-billing regression with `48/48` passing checks.
 - 2026-04-04 16:46:41 +05:30: Expanded endpoint regression coverage to include every mounted backend endpoint (including `POST /api/auth/signup` and deprecated `POST /api/webhooks/stripe`) and completed full pass with `50/50` successful checks.
+- 2026-04-04 19:11:52 +05:30: Removed dashboard billing-portal API invocation for Razorpay and replaced it with in-dashboard status refresh + cancel controls to prevent expected provider limitation messages from surfacing as UI errors.
+- 2026-04-04 19:11:52 +05:30: Improved subscription management UI with status badge/tone, structured monthly-yearly plan cards, and formatted period-end date display; frontend lint and production build pass after patch.
+- 2026-04-04 19:29:37 +05:30: Implemented PRD hardening pass: branded transactional email templates (welcome, draw results, winner, verification, payout), draw publish notification upgrade, charity search + featured filtering, dashboard participation summary module, and safer cancellation/admin subscription validation.
+- 2026-04-04 19:29:37 +05:30: Expanded admin analytics with active subscribers, pending verification, pending payouts, and unsettled jackpot metrics; enabled Express trust proxy for hosted rate-limit compatibility.
+- 2026-04-04 19:29:37 +05:30: Revalidated app quality gates: frontend lint pass, frontend production build pass, backend non-billing regression pass (`50/50`, `FAILED=0`) after collision-safe draw-month retry hardening in regression script.
 
 ## Notes
 - Money values stored in paise (integers) only

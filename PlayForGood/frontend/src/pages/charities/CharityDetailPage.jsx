@@ -2,6 +2,30 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiRequest } from "../../lib/api";
 
+function HeroImage({ src, alt }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Charity Profile</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="h-full w-full object-cover"
+      loading="lazy"
+      onError={() => {
+        setFailed(true);
+      }}
+    />
+  );
+}
+
 export default function CharityDetailPage() {
   const { slug } = useParams();
   const [charity, setCharity] = useState(null);
@@ -31,18 +55,14 @@ export default function CharityDetailPage() {
       <Link to="/charities" className="text-sm font-semibold text-neonSoft">Back to charities</Link>
       <section className="glass mt-4 overflow-hidden rounded-3xl">
         <div className="h-60 w-full bg-slate-800">
-          {charity.image_url ? (
-            <img
-              src={charity.image_url}
-              alt={charity.name}
-              className="h-full w-full object-cover"
-              onError={(event) => {
-                event.currentTarget.style.display = "none";
-              }}
-            />
-          ) : null}
+          <HeroImage src={charity.image_url} alt={charity.name} />
         </div>
         <div className="p-6">
+          {charity.is_featured ? (
+            <p className="mb-2 inline-block rounded-full border border-cyan-200/30 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-cyan-100">
+              Featured Charity
+            </p>
+          ) : null}
           <h1 className="text-3xl font-bold">{charity.name}</h1>
           <p className="mt-2 text-slate-300">{charity.short_description}</p>
           <p className="mt-4 text-sm leading-7 text-slate-200">{charity.long_description}</p>

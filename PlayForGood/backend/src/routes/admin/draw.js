@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
 import { getCurrentDrawMonth } from "../../utils/date.js";
+import { env } from "../../config/env.js";
 import { getSupabaseAdminClient } from "../../supabase/client.js";
 import { requireAdmin } from "../../middleware/auth.js";
 import { publishDraw, simulateDraw } from "../../services/draw-engine.js";
-import { sendTransactionalEmail } from "../../services/email.js";
+import { buildDrawPublishedEmailHtml, buildWinnerCongratsEmailHtml, sendTransactionalEmail } from "../../services/email.js";
 import { ok, badRequest, serverError } from "../../http/responses.js";
 
 const router = Router();
@@ -149,7 +150,11 @@ router.post("/publish", requireAdmin, async (req, res) => {
         await sendTransactionalEmail({
           to: participant.email,
           subject: `Draw Results Published - ${result.draw.draw_month}`,
-          html: `<p>Draw numbers: ${result.draw.numbers_json.join(", ")}.</p><p>Check your dashboard for your personal match result.</p>`
+          html: buildDrawPublishedEmailHtml({
+            drawMonth: result.draw.draw_month,
+            numbers: result.draw.numbers_json,
+            dashboardUrl: `${env.APP_URL.replace(/\/$/, "")}/dashboard/winnings`
+          })
         });
       }
     }
@@ -174,7 +179,10 @@ router.post("/publish", requireAdmin, async (req, res) => {
         await sendTransactionalEmail({
           to: winner.email,
           subject: "You Won on PlayForGood",
-          html: `<p>Congratulations! You won INR ${(total / 100).toFixed(2)}. Please upload your proof screenshot in dashboard for verification.</p>`
+          html: buildWinnerCongratsEmailHtml({
+            amountPaise: total,
+            dashboardUrl: `${env.APP_URL.replace(/\/$/, "")}/dashboard/winnings`
+          })
         });
       }
     }

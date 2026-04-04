@@ -5,6 +5,23 @@ import { useAuth } from "../../context/AuthContext";
 const MONTHLY_PRICE = 499;
 const YEARLY_PRICE = 4999;
 
+function formatPeriodEnd(value) {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
+}
+
 export default function SubscriptionPage() {
   const { profile } = useAuth();
   const [status, setStatus] = useState(null);
@@ -17,6 +34,7 @@ export default function SubscriptionPage() {
 
   async function loadStatus() {
     try {
+      setError("");
       const data = await apiRequest("/subscriptions/status", { method: "GET" });
       setStatus(data.latest || null);
     } catch (loadError) {
@@ -56,29 +74,33 @@ export default function SubscriptionPage() {
     }
   }
 
-  async function openPortal() {
+  async function refreshStatus() {
     try {
-      setLoading("portal");
+      setLoading("status");
       setError("");
-
-      const data = await apiRequest("/subscriptions/create-portal-session", {
-        method: "POST"
-      });
-
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (portalError) {
-      setError(portalError.message || "Unable to open billing portal");
+      setMessage("");
+      await loadStatus();
+      setMessage("Subscription status refreshed.");
+    } catch (statusError) {
+      setError(statusError.message || "Unable to refresh subscription status");
     } finally {
       setLoading("");
     }
   }
 
   async function cancelAtPeriodEnd() {
+    const confirmed = window.confirm(
+      "Your subscription will stay active until your current billing period ends, then access to score entry and draw participation will stop. Continue?\n\nTechnical note: this sets cancel_at_period_end=true for your active Razorpay subscription."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
       setLoading("cancel");
       setError("");
+      setMessage("");
 
       await apiRequest("/subscriptions/cancel", {
         method: "POST"
@@ -93,39 +115,69 @@ export default function SubscriptionPage() {
     }
   }
 
+  const statusLabel = status?.status || "inactive";
+  const statusToneClass =
+    statusLabel === "active"
+      ? "border-success/40 bg-success/10 text-success"
+      : statusLabel === "canceled" || statusLabel === "cancelled"
+        ? "border-danger/40 bg-danger/10 text-danger"
+        : "border-cyan-200/30 bg-cyan-500/10 text-cyan-100";
+
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-6 py-10">
       <section className="glass rounded-2xl p-6">
-        <h1 className="text-2xl font-bold">Subscription Management</h1>
-        <p className="mt-2 text-sm text-slate-300">Razorpay test mode is active. Prices are fixed in INR.</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold">Subscription Management</h1>
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusToneClass}`}>
+            {statusLabel}
+          </span>
+        </div>
+        <p className="mt-2 text-sm text-slate-300">
+          Razorpay test mode is active. Billing portal is not supported, so subscription updates are handled directly here.
+        </p>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => void createCheckout("monthly")}
-            disabled={Boolean(loading)}
-            className="rounded-xl bg-neon px-4 py-3 text-sm font-bold text-black disabled:opacity-50"
-          >
-            {loading === "monthly" ? "Opening..." : `Subscribe Monthly (INR ${MONTHLY_PRICE})`}
-          </button>
-          <button
-            type="button"
-            onClick={() => void createCheckout("yearly")}
-            disabled={Boolean(loading)}
-            className="rounded-xl border border-cyan-200/30 px-4 py-3 text-sm font-semibold disabled:opacity-50"
-          >
-            {loading === "yearly" ? "Opening..." : `Subscribe Yearly (INR ${YEARLY_PRICE})`}
-          </button>
+          <article className="rounded-xl border border-cyan-200/20 bg-panel/50 p-4">
+            <p className="text-xs uppercase tracking-wide text-cyan-200">Monthly Plan</p>
+            <p className="mt-2 text-2xl font-bold">INR {MONTHLY_PRICE}</p>
+            <p className="mt-1 text-xs text-slate-300">Billed every month</p>
+            <button
+              type="button"
+              onClick={() => void createCheckout("monthly")}
+              disabled={Boolean(loading)}
+              className="mt-4 w-full rounded-xl bg-neon px-4 py-3 text-sm font-bold text-black disabled:opacity-50"
+            >
+              {loading === "monthly" ? "Opening..." : "Choose Monthly"}
+            </button>
+          </article>
+
+          <article className="rounded-xl border border-cyan-200/20 bg-panel/50 p-4">
+            <p className="text-xs uppercase tracking-wide text-cyan-200">Yearly Plan</p>
+            <p className="mt-2 text-2xl font-bold">INR {YEARLY_PRICE}</p>
+            <p className="mt-1 text-xs text-slate-300">Best value for long-term support</p>
+            <button
+              type="button"
+              onClick={() => void createCheckout("yearly")}
+              disabled={Boolean(loading)}
+              className="mt-4 w-full rounded-xl border border-cyan-200/30 px-4 py-3 text-sm font-semibold disabled:opacity-50"
+            >
+              {loading === "yearly" ? "Opening..." : "Choose Yearly"}
+            </button>
+          </article>
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-3">
+        <div className="mt-5 rounded-lg border border-cyan-200/20 bg-cyan-500/5 px-4 py-3 text-sm text-slate-200">
+          Razorpay does not provide a hosted billing portal. Use the controls below to refresh status or cancel at period end.
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={() => void openPortal()}
+            onClick={() => void refreshStatus()}
             disabled={Boolean(loading)}
             className="rounded-lg border border-cyan-200/30 px-4 py-2 text-sm disabled:opacity-50"
           >
-            {loading === "portal" ? "Checking..." : "Billing Portal (Not Available)"}
+            {loading === "status" ? "Refreshing..." : "Refresh Subscription Status"}
           </button>
           <button
             type="button"
@@ -137,10 +189,10 @@ export default function SubscriptionPage() {
           </button>
         </div>
 
-        <div className="mt-6 rounded-xl border border-cyan-200/20 p-4 text-sm">
-          <p>Status: {status?.status || "inactive"}</p>
+        <div className="mt-6 rounded-xl border border-cyan-200/20 bg-panel/40 p-4 text-sm">
+          <p>Status: {statusLabel}</p>
           <p>Plan: {status?.plan_type || "none"}</p>
-          <p>Period End: {status?.current_period_end || "-"}</p>
+          <p>Period End: {formatPeriodEnd(status?.current_period_end)}</p>
           <p>Cancel at Period End: {String(status?.cancel_at_period_end || false)}</p>
         </div>
 

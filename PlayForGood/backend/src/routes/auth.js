@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
 import { APP_CONSTANTS } from "../constants/app.js";
+import { env } from "../config/env.js";
 import { getSupabaseAdminClient, getSupabaseAnonClient } from "../supabase/client.js";
 import { created, ok, badRequest, unauthorized, serverError } from "../http/responses.js";
-import { sendTransactionalEmail } from "../services/email.js";
+import { buildWelcomeEmailHtml, sendTransactionalEmail } from "../services/email.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -76,7 +77,9 @@ router.post("/signup", async (req, res) => {
     await sendTransactionalEmail({
       to: parsed.data.email,
       subject: "Welcome to PlayForGood",
-      html: "<p>Your account has been created successfully. Complete subscription to unlock score entry and monthly draws.</p>"
+      html: buildWelcomeEmailHtml({
+        dashboardUrl: `${env.APP_URL.replace(/\/$/, "")}/dashboard`
+      })
     });
 
     return created(res, {

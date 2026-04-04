@@ -106,6 +106,25 @@ router.patch("/:id/subscription", requireAdmin, async (req, res) => {
       return badRequest(res, "Invalid subscription override payload", parsed.error.flatten());
     }
 
+    const startTime = new Date(parsed.data.currentPeriodStart).getTime();
+    const endTime = new Date(parsed.data.currentPeriodEnd).getTime();
+
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+      return badRequest(res, "Subscription period values must be valid ISO datetime strings.");
+    }
+
+    if (endTime <= startTime) {
+      return badRequest(res, "Subscription period end must be after period start.");
+    }
+
+    if (parsed.data.status === "active" && endTime <= Date.now()) {
+      return badRequest(res, "Active subscriptions must have a future period end date.");
+    }
+
+    if (parsed.data.cancelAtPeriodEnd && parsed.data.status !== "active") {
+      return badRequest(res, "Cancel at period end can only be set when status is active.");
+    }
+
     const adminClient = getSupabaseAdminClient();
     const amountPaise = parsed.data.planType === "monthly" ? 49900 : 499900;
 
