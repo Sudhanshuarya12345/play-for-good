@@ -135,7 +135,9 @@ router.get("/status", requireAuth, async (req, res) => {
     const adminClient = getSupabaseAdminClient();
     let { data: latest } = await adminClient
       .from("subscriptions")
-      .select("id, stripe_subscription_id, status, plan_type, current_period_start, current_period_end, cancel_at_period_end")
+      .select(
+        "id, stripe_subscription_id, status, plan_type, current_period_start, current_period_end, cancel_at_period_end, updated_at"
+      )
       .eq("user_id", req.auth.user.id)
       .order("updated_at", { ascending: false })
       .limit(1)
@@ -143,8 +145,17 @@ router.get("/status", requireAuth, async (req, res) => {
 
     let active = await getActiveSubscription({ adminClient, userId: req.auth.user.id });
 
-    // Fallback sync: if webhook update is delayed/missed, refresh latest subscription from Razorpay.
-    if (!active && latest?.stripe_subscription_id && isRazorpayEnabled()) {
+    const shouldSyncLatestFromProvider = Boolean(
+      isRazorpayEnabled() &&
+        latest?.stripe_subscription_id &&
+        (!active ||
+          active.stripe_subscription_id !== latest.stripe_subscription_id ||
+          latest.status !== "active" ||
+          !latest.current_period_end)
+    );
+
+    // Fallback sync: refresh latest subscription from Razorpay when local data can be stale.
+    if (shouldSyncLatestFromProvider) {
       try {
         const razorpay = getRazorpayClient();
         const liveSubscription = await razorpay.subscriptions.fetch(latest.stripe_subscription_id);
@@ -158,7 +169,9 @@ router.get("/status", requireAuth, async (req, res) => {
 
         const { data: refreshedLatest } = await adminClient
           .from("subscriptions")
-          .select("id, stripe_subscription_id, status, plan_type, current_period_start, current_period_end, cancel_at_period_end")
+          .select(
+            "id, stripe_subscription_id, status, plan_type, current_period_start, current_period_end, cancel_at_period_end, updated_at"
+          )
           .eq("user_id", req.auth.user.id)
           .order("updated_at", { ascending: false })
           .limit(1)
