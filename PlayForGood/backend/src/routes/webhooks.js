@@ -94,7 +94,18 @@ router.post("/razorpay", async (req, res) => {
     const subscriptionPayload = event?.payload?.subscription?.entity || null;
 
     if (subscriptionPayload) {
-      const userId = subscriptionPayload?.notes?.user_id;
+      let userId = subscriptionPayload?.notes?.user_id;
+      if (!userId && subscriptionPayload.id) {
+        const { data: existingSub } = await adminClient
+          .from("subscriptions")
+          .select("user_id")
+          .eq("stripe_subscription_id", subscriptionPayload.id)
+          .maybeSingle();
+        if (existingSub?.user_id) {
+          userId = existingSub.user_id;
+        }
+      }
+
       if (userId) {
         await upsertSubscriptionFromRazorpay({
           adminClient,

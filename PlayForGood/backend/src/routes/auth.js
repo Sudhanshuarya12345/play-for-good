@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import dns from "node:dns/promises";
 import { APP_CONSTANTS } from "../constants/app.js";
 import { env } from "../config/env.js";
 import { getSupabaseAdminClient, getSupabaseAnonClient } from "../supabase/client.js";
@@ -27,11 +28,86 @@ const loginSchema = z.object({
   password: z.string().min(8)
 });
 
+function getFieldFirstError(fieldErrors, fieldName) {
+  const errors = fieldErrors?.[fieldName];
+  if (!Array.isArray(errors) || errors.length === 0) {
+    return "";
+  }
+
+  return String(errors[0] || "").trim();
+}
+
+function buildSignupValidationMessage(zodError) {
+  const flattened = zodError.flatten();
+  const fieldErrors = flattened.fieldErrors || {};
+
+  const emailError = getFieldFirstError(fieldErrors, "email");
+  const passwordError = getFieldFirstError(fieldErrors, "password");
+  const fullNameError = getFieldFirstError(fieldErrors, "fullName");
+  const charityPercentError = getFieldFirstError(fieldErrors, "charityPercent");
+
+  const hints = [];
+  if (emailError) {
+    hints.push("enter a valid email address");
+  }
+  if (passwordError) {
+    hints.push("use a password with at least 8 characters");
+  }
+  if (fullNameError) {
+    hints.push("enter your full name (minimum 2 characters)");
+  }
+  if (charityPercentError) {
+    hints.push(`choose charity contribution between ${APP_CONSTANTS.minCharityPercent}% and 40%`);
+  }
+
+  if (!hints.length) {
+    return "Please check your signup details and try again.";
+  }
+
+  return `Please ${hints.join(", ")}.`;
+}
+
+function buildLoginValidationMessage(zodError) {
+  const flattened = zodError.flatten();
+  const fieldErrors = flattened.fieldErrors || {};
+
+  const emailError = getFieldFirstError(fieldErrors, "email");
+  const passwordError = getFieldFirstError(fieldErrors, "password");
+
+  if (emailError && passwordError) {
+    return "Please enter a valid email and a password with at least 8 characters.";
+  }
+
+  if (emailError) {
+    return "Please enter a valid email address.";
+  }
+
+  if (passwordError) {
+    return "Please enter a password with at least 8 characters.";
+  }
+
+  return "Please check your login details and try again.";
+}
+
 router.post("/signup", async (req, res) => {
   try {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) {
-      return badRequest(res, "Invalid signup payload", parsed.error.flatten());
+      return badRequest(res, buildSignupValidationMessage(parsed.error), parsed.error.flatten());
+    }
+
+    const domain = parsed.data.email.split("@")[1];
+    if (!domain) {
+      return badRequest(res, "Invalid email domain");
+    }
+
+    try {
+      const records = await dns.resolveMx(domain);
+      if (!records || records.length === 0) {
+        return badRequest(res, "Invalid email address (domain does not accept emails).");
+      }
+    } catch (dnsError) {
+      return badRequest(res, "Invalid email address (domain does not exist or rejects mail).");
     }
 
     const adminClient = getSupabaseAdminClient();
@@ -96,7 +172,7 @@ router.post("/login", async (req, res) => {
   try {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      return badRequest(res, "Invalid login payload", parsed.error.flatten());
+      return badRequest(res, buildLoginValidationMessage(parsed.error), parsed.error.flatten());
     }
 
     const anonClient = getSupabaseAnonClient();
