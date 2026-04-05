@@ -2,6 +2,8 @@ import { APP_CONSTANTS } from "../constants/app.js";
 import { calculateAllocation } from "../utils/money.js";
 import { env } from "../config/env.js";
 
+const EXTENSION_BASE_STATUSES = ["active", "canceled"];
+
 function mapRazorpaySubscriptionStatus(status) {
   if (["active", "authenticated"].includes(status)) {
     return "active";
@@ -87,6 +89,30 @@ function addPlanDurationFromIso(isoValue, planType) {
   return null;
 }
 
+function toMillisFromIso(isoValue) {
+  const parsed = new Date(isoValue).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function pickLaterIso(leftIso, rightIso) {
+  const leftMs = toMillisFromIso(leftIso);
+  const rightMs = toMillisFromIso(rightIso);
+
+  if (!Number.isFinite(leftMs) && !Number.isFinite(rightMs)) {
+    return null;
+  }
+
+  if (!Number.isFinite(leftMs)) {
+    return rightIso || null;
+  }
+
+  if (!Number.isFinite(rightMs)) {
+    return leftIso || null;
+  }
+
+  return leftMs >= rightMs ? leftIso : rightIso;
+}
+
 async function normalizeActiveEntitlementPeriod({ adminClient, payload, userId }) {
   if (!["monthly", "yearly"].includes(payload.plan_type)) {
     return payload;
@@ -98,18 +124,24 @@ async function normalizeActiveEntitlementPeriod({ adminClient, payload, userId }
 
   const nowIso = new Date().toISOString();
 
-  const { data: priorActive } = await adminClient
+  const { data: priorEntitlement } = await adminClient
     .from("subscriptions")
     .select("stripe_subscription_id, current_period_end")
     .eq("user_id", userId)
-    .eq("status", "active")
+    .in("status", EXTENSION_BASE_STATUSES)
     .gt("current_period_end", nowIso)
     .neq("stripe_subscription_id", payload.stripe_subscription_id)
     .order("current_period_end", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  let normalizedStart = priorActive?.current_period_end || payload.current_period_start;
+  const providerStartIso = payload.current_period_start;
+  const priorEntitlementEndIso = priorEntitlement?.current_period_end || null;
+
+  // Use the later boundary to avoid accidental backdating when provider and local boundaries differ.
+  let normalizedStart =
+    pickLaterIso(priorEntitlementEndIso, providerStartIso) || priorEntitlementEndIso || providerStartIso;
+
   if (!normalizedStart || Number.isNaN(new Date(normalizedStart).getTime())) {
     normalizedStart = nowIso;
   }
@@ -119,13 +151,7 @@ async function normalizeActiveEntitlementPeriod({ adminClient, payload, userId }
     return payload;
   }
 
-  const providerEndMs = new Date(payload.current_period_end || "").getTime();
-  const normalizedEndMs = new Date(normalizedEnd).getTime();
-
-  const resolvedEnd =
-    Number.isFinite(providerEndMs) && providerEndMs > normalizedEndMs
-      ? new Date(providerEndMs).toISOString()
-      : normalizedEnd;
+  const resolvedEnd = pickLaterIso(normalizedEnd, payload.current_period_end) || normalizedEnd;
 
   return {
     ...payload,

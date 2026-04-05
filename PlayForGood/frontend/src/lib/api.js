@@ -20,8 +20,24 @@ export async function apiRequest(path, options = {}) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok || !payload.success) {
+    const isUnauthorized = response.status === 401;
+    const isAuthEndpoint = String(path || "").startsWith("/auth/");
+
+    if (isUnauthorized && !isAuthEndpoint && typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("playforgood:auth-expired", {
+          detail: {
+            path,
+            status: response.status
+          }
+        })
+      );
+    }
+
     const message = payload?.error?.message || `Request failed with status ${response.status}`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return payload.data;
