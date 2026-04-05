@@ -25,6 +25,21 @@ function ensureRazorpayEnabled(res) {
   return false;
 }
 
+function extractProviderErrorMessage(error, fallbackMessage) {
+  return (
+    error?.error?.description ||
+    error?.error?.reason ||
+    error?.message ||
+    error?.description ||
+    fallbackMessage
+  );
+}
+
+function isClientProviderError(error) {
+  const status = Number(error?.statusCode || error?.status || 0);
+  return Number.isFinite(status) && status >= 400 && status < 500;
+}
+
 router.post("/create-checkout-session", requireAuth, async (req, res) => {
   try {
     if (!ensureRazorpayEnabled(res)) {
@@ -41,6 +56,10 @@ router.post("/create-checkout-session", requireAuth, async (req, res) => {
     const planId = parsed.data.planType === "monthly" ? env.RAZORPAY_MONTHLY_PLAN_ID : env.RAZORPAY_YEARLY_PLAN_ID;
     const totalCount = parsed.data.planType === "monthly" ? 120 : 10;
 
+    if (!planId) {
+      return badRequest(res, `Missing Razorpay plan configuration for ${parsed.data.planType} plan.`);
+    }
+
     const { data: profile } = await adminClient
       .from("profiles")
       .select("email, selected_charity_id")
@@ -55,19 +74,29 @@ router.post("/create-checkout-session", requireAuth, async (req, res) => {
       })
       .eq("id", req.auth.user.id);
 
-    const razorpaySubscription = await razorpay.subscriptions.create({
-      plan_id: planId,
-      total_count: totalCount,
-      quantity: 1,
-      customer_notify: 1,
-      notes: {
-        user_id: req.auth.user.id,
-        user_email: req.auth.user.email || profile?.email || "",
-        charity_percent: String(parsed.data.charityPercent),
-        selected_charity_id: parsed.data.selectedCharityId || "",
-        plan_type: parsed.data.planType
+    let razorpaySubscription;
+    try {
+      razorpaySubscription = await razorpay.subscriptions.create({
+        plan_id: planId,
+        total_count: totalCount,
+        quantity: 1,
+        customer_notify: 1,
+        notes: {
+          user_id: req.auth.user.id,
+          user_email: req.auth.user.email || profile?.email || "",
+          charity_percent: String(parsed.data.charityPercent),
+          selected_charity_id: parsed.data.selectedCharityId || "",
+          plan_type: parsed.data.planType
+        }
+      });
+    } catch (providerError) {
+      const message = extractProviderErrorMessage(providerError, "Unable to create Razorpay checkout session.");
+      if (isClientProviderError(providerError)) {
+        return badRequest(res, message);
       }
-    });
+
+      return serverError(res, message);
+    }
 
     await upsertSubscriptionFromRazorpay({
       adminClient,
@@ -113,9 +142,10 @@ router.get("/status", requireAuth, async (req, res) => {
       .maybeSingle();
 
     const active = await getActiveSubscription({ adminClient, userId: req.auth.user.id });
+    const latestForDisplay = active || latest || null;
 
     return ok(res, {
-      latest: latest || null,
+      latest: latestForDisplay,
       active: Boolean(active)
     });
   } catch (error) {
@@ -145,7 +175,18 @@ router.post("/cancel", requireAuth, async (req, res) => {
     }
 
     const razorpay = getRazorpayClient();
-    const canceled = await razorpay.subscriptions.cancel(subscription.stripe_subscription_id, true);
+    let canceled;
+
+    try {
+      canceled = await razorpay.subscriptions.cancel(subscription.stripe_subscription_id, true);
+    } catch (providerError) {
+      const message = extractProviderErrorMessage(providerError, "Unable to cancel Razorpay subscription.");
+      if (isClientProviderError(providerError)) {
+        return badRequest(res, message);
+      }
+
+      return serverError(res, message);
+    }
 
     const status = canceled?.status === "cancelled" ? "canceled" : "active";
 

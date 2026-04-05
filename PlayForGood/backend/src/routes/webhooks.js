@@ -56,6 +56,48 @@ function verifyRazorpaySignature(rawBody, signature) {
   return crypto.timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
+async function syncSubscriptionFromProviderById({
+  adminClient,
+  razorpay,
+  subscriptionId,
+  fallbackUserId = null
+}) {
+  if (!subscriptionId) {
+    return null;
+  }
+
+  const liveSubscription = await razorpay.subscriptions.fetch(subscriptionId);
+
+  let resolvedUserId = liveSubscription?.notes?.user_id || fallbackUserId || null;
+  if (!resolvedUserId) {
+    const { data: existingSub } = await adminClient
+      .from("subscriptions")
+      .select("user_id")
+      .eq("stripe_subscription_id", subscriptionId)
+      .maybeSingle();
+
+    if (existingSub?.user_id) {
+      resolvedUserId = existingSub.user_id;
+    }
+  }
+
+  if (!resolvedUserId) {
+    return null;
+  }
+
+  const localSubscriptionId = await upsertSubscriptionFromRazorpay({
+    adminClient,
+    razorpaySubscription: liveSubscription,
+    userId: resolvedUserId,
+    razorpayCustomerId: liveSubscription.customer_id || null
+  });
+
+  return {
+    id: localSubscriptionId,
+    user_id: resolvedUserId
+  };
+}
+
 router.post("/razorpay", async (req, res) => {
   if (!isRazorpayEnabled()) {
     return res.status(200).json({ success: true, ignored: true, reason: "Razorpay is disabled" });
@@ -141,24 +183,21 @@ router.post("/razorpay", async (req, res) => {
     if (eventType === "payment.captured") {
       const payment = event?.payload?.payment?.entity;
       if (payment?.subscription_id) {
-        let { data: localSubscription } = await adminClient
-          .from("subscriptions")
-          .select("id, user_id")
-          .eq("stripe_subscription_id", payment.subscription_id)
-          .maybeSingle();
+        let localSubscription = await syncSubscriptionFromProviderById({
+          adminClient,
+          razorpay,
+          subscriptionId: payment.subscription_id,
+          fallbackUserId: payment?.notes?.user_id || null
+        });
 
         if (!localSubscription?.user_id) {
-          const liveSubscription = await razorpay.subscriptions.fetch(payment.subscription_id);
-          const liveUserId = liveSubscription?.notes?.user_id;
-          if (liveUserId) {
-            const localSubscriptionId = await upsertSubscriptionFromRazorpay({
-              adminClient,
-              razorpaySubscription: liveSubscription,
-              userId: liveUserId,
-              razorpayCustomerId: liveSubscription.customer_id || null
-            });
-            localSubscription = { id: localSubscriptionId, user_id: liveUserId };
-          }
+          const { data: existingLocalSubscription } = await adminClient
+            .from("subscriptions")
+            .select("id, user_id")
+            .eq("stripe_subscription_id", payment.subscription_id)
+            .maybeSingle();
+
+          localSubscription = existingLocalSubscription || null;
         }
 
         if (localSubscription?.user_id) {
@@ -183,16 +222,12 @@ router.post("/razorpay", async (req, res) => {
     if (eventType === "payment.failed") {
       const failedPayment = event?.payload?.payment?.entity;
       if (failedPayment?.subscription_id) {
-        const liveSubscription = await razorpay.subscriptions.fetch(failedPayment.subscription_id);
-        const liveUserId = liveSubscription?.notes?.user_id;
-        if (liveUserId) {
-          await upsertSubscriptionFromRazorpay({
-            adminClient,
-            razorpaySubscription: liveSubscription,
-            userId: liveUserId,
-            razorpayCustomerId: liveSubscription.customer_id || null
-          });
-        }
+        await syncSubscriptionFromProviderById({
+          adminClient,
+          razorpay,
+          subscriptionId: failedPayment.subscription_id,
+          fallbackUserId: failedPayment?.notes?.user_id || null
+        });
       }
     }
 

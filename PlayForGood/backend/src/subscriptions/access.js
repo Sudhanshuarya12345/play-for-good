@@ -1,8 +1,12 @@
 export async function getActiveSubscription({ adminClient, userId }) {
+  const nowIso = new Date().toISOString();
+
   const { data, error } = await adminClient
     .from("subscriptions")
     .select("id, status, plan_type, current_period_end")
     .eq("user_id", userId)
+    .eq("status", "active")
+    .gt("current_period_end", nowIso)
     .order("current_period_end", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -11,15 +15,7 @@ export async function getActiveSubscription({ adminClient, userId }) {
     return null;
   }
 
-  const currentPeriodEnd = data.current_period_end ? new Date(data.current_period_end) : null;
-  const activeByStatus = data.status === "active";
-  const activeByDate = currentPeriodEnd ? currentPeriodEnd.getTime() > Date.now() : false;
-
-  if (activeByStatus && activeByDate) {
-    return data;
-  }
-
-  return null;
+  return data;
 }
 
 export async function hasActiveSubscription({ adminClient, userId }) {
