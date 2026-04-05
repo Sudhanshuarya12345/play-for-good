@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 
 const MONTHLY_PRICE = 499;
 const YEARLY_PRICE = 4999;
+const CHECKOUT_PENDING_KEY = "playforgood_checkout_pending";
 
 function formatPeriodEnd(value) {
   if (!value) {
@@ -29,12 +30,13 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [pendingCheckout, setPendingCheckout] = useState(false);
+  const [showReturnBanner, setShowReturnBanner] = useState(false);
+  const [hasAutoRefreshAttempted, setHasAutoRefreshAttempted] = useState(false);
 
   const charityPercent = useMemo(() => profile?.charity_percent || 10, [profile]);
   const selectedCharityId = useMemo(() => profile?.selected_charity_id || null, [profile]);
 
-  async function loadStatus({ silentErrors = false } = {}) {
+  const loadStatus = useCallback(async ({ silentErrors = false } = {}) => {
     try {
       if (!silentErrors) {
         setError("");
@@ -51,40 +53,28 @@ export default function SubscriptionPage() {
 
       throw loadError;
     }
-  }
-
-  useEffect(() => {
-    void loadStatus().catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (!pendingCheckout) {
-      return undefined;
-    }
+    void loadStatus().catch(() => {});
+  }, [loadStatus]);
 
-    function syncStatusOnReturn() {
-      if (document.visibilityState !== "visible") {
-        return;
+  useEffect(() => {
+    function syncReturnBanner() {
+      const hasPendingCheckout = Boolean(localStorage.getItem(CHECKOUT_PENDING_KEY));
+      setShowReturnBanner(hasPendingCheckout);
+      if (hasPendingCheckout) {
+        setHasAutoRefreshAttempted(false);
       }
-
-      void loadStatus({ silentErrors: true })
-        .then((latest) => {
-          if (latest?.status === "active") {
-            setPendingCheckout(false);
-            setMessage("Subscription is active. Period end has been refreshed.");
-          }
-        })
-        .catch(() => {});
     }
 
-    window.addEventListener("focus", syncStatusOnReturn);
-    document.addEventListener("visibilitychange", syncStatusOnReturn);
+    syncReturnBanner();
+    window.addEventListener("pageshow", syncReturnBanner);
 
     return () => {
-      window.removeEventListener("focus", syncStatusOnReturn);
-      document.removeEventListener("visibilitychange", syncStatusOnReturn);
+      window.removeEventListener("pageshow", syncReturnBanner);
     };
-  }, [pendingCheckout]);
+  }, []);
 
   async function createCheckout(planType) {
     try {
@@ -102,17 +92,8 @@ export default function SubscriptionPage() {
       });
 
       if (data.checkoutUrl) {
-        const checkoutWindow = window.open(data.checkoutUrl, "_blank", "noopener,noreferrer");
-
-        if (checkoutWindow) {
-          setPendingCheckout(true);
-          setMessage(
-            "Checkout opened in a new tab. Complete payment there, then return here and click I Completed Payment."
-          );
-          return;
-        }
-
-        setMessage("Popup was blocked, redirecting checkout in this tab. Use browser back to return.");
+        localStorage.setItem(CHECKOUT_PENDING_KEY, JSON.stringify({ planType, startedAt: Date.now() }));
+        setMessage("Redirecting to Razorpay checkout...");
         window.location.href = data.checkoutUrl;
         return;
       }
@@ -125,41 +106,56 @@ export default function SubscriptionPage() {
     }
   }
 
-  async function refreshStatus() {
+  const refreshStatus = useCallback(async ({ auto = false } = {}) => {
     try {
+      if (showReturnBanner && !auto) {
+        setHasAutoRefreshAttempted(true);
+      }
+
       setLoading("status");
       setError("");
       setMessage("");
-      await loadStatus();
+      const latest = await loadStatus();
+
+      if (showReturnBanner && latest?.status === "active") {
+        localStorage.removeItem(CHECKOUT_PENDING_KEY);
+        setShowReturnBanner(false);
+        setHasAutoRefreshAttempted(false);
+        setMessage(`Subscription is active. Updated period end: ${formatPeriodEnd(latest.current_period_end)}.`);
+        return;
+      }
+
+      if (showReturnBanner) {
+        if (auto) {
+          setMessage("Payment is still processing. Auto-check completed; you can click Refresh Now.");
+        } else {
+          setMessage("Payment is still processing. Please wait a few seconds and refresh again.");
+        }
+        return;
+      }
+
       setMessage("Subscription status refreshed.");
     } catch (statusError) {
       setError(statusError.message || "Unable to refresh subscription status");
     } finally {
       setLoading("");
     }
-  }
+  }, [loadStatus, showReturnBanner]);
 
-  async function verifyCheckoutCompletion() {
-    try {
-      setLoading("verify");
-      setError("");
-      setMessage("");
-
-      const latest = await loadStatus();
-
-      if (latest?.status === "active" && latest?.current_period_end) {
-        setPendingCheckout(false);
-        setMessage(`Subscription is active. Updated period end: ${formatPeriodEnd(latest.current_period_end)}.`);
-        return;
-      }
-
-      setMessage("Payment is still processing. Please wait a few seconds and click I Completed Payment again.");
-    } catch (statusError) {
-      setError(statusError.message || "Unable to verify subscription payment");
-    } finally {
-      setLoading("");
+  useEffect(() => {
+    if (!showReturnBanner || hasAutoRefreshAttempted) {
+      return undefined;
     }
-  }
+
+    const timeoutId = window.setTimeout(() => {
+      setHasAutoRefreshAttempted(true);
+      void refreshStatus({ auto: true });
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [showReturnBanner, hasAutoRefreshAttempted, refreshStatus]);
 
   async function cancelAtPeriodEnd() {
     const confirmed = window.confirm(
@@ -220,7 +216,7 @@ export default function SubscriptionPage() {
               disabled={Boolean(loading)}
               className="mt-4 w-full rounded-xl bg-neon px-4 py-3 text-sm font-bold text-black disabled:opacity-50"
             >
-              {loading === "monthly" ? "Opening..." : "Choose Monthly (New Tab)"}
+              {loading === "monthly" ? "Opening..." : "Choose Monthly"}
             </button>
           </article>
 
@@ -234,26 +230,26 @@ export default function SubscriptionPage() {
               disabled={Boolean(loading)}
               className="mt-4 w-full rounded-xl border border-cyan-200/30 px-4 py-3 text-sm font-semibold disabled:opacity-50"
             >
-              {loading === "yearly" ? "Opening..." : "Choose Yearly (New Tab)"}
+              {loading === "yearly" ? "Opening..." : "Choose Yearly"}
             </button>
           </article>
         </div>
 
         <div className="mt-5 rounded-lg border border-cyan-200/20 bg-cyan-500/5 px-4 py-3 text-sm text-slate-200">
-          Razorpay does not provide a hosted billing portal. Use the controls below to refresh status or cancel at period end.
+          Razorpay does not provide a hosted billing portal. After payment, use browser back and then Refresh Subscription Status.
         </div>
 
-        {pendingCheckout ? (
+        {showReturnBanner ? (
           <div className="mt-4 rounded-lg border border-neon/30 bg-neon/10 px-4 py-3 text-sm text-cyan-50">
-            <p>Payment is open in another tab. After successful payment, return here to sync your updated period end.</p>
+            <p>Returned from Razorpay? Click Refresh Now to fetch your latest subscription period.</p>
             <div className="mt-3 flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() => void verifyCheckoutCompletion()}
+                onClick={() => void refreshStatus()}
                 disabled={Boolean(loading)}
                 className="rounded-lg bg-neon px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
               >
-                {loading === "verify" ? "Checking..." : "I Completed Payment"}
+                {loading === "status" ? "Refreshing..." : "Refresh Now"}
               </button>
               <Link
                 to="/dashboard"
