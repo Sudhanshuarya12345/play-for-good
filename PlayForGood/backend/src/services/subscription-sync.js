@@ -68,6 +68,72 @@ function resolveCancelAtPeriodEnd(razorpaySubscription) {
   return false;
 }
 
+function addPlanDurationFromIso(isoValue, planType) {
+  const parsed = new Date(isoValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  if (planType === "monthly") {
+    parsed.setUTCMonth(parsed.getUTCMonth() + 1);
+    return parsed.toISOString();
+  }
+
+  if (planType === "yearly") {
+    parsed.setUTCFullYear(parsed.getUTCFullYear() + 1);
+    return parsed.toISOString();
+  }
+
+  return null;
+}
+
+async function normalizeActiveEntitlementPeriod({ adminClient, payload, userId }) {
+  if (!["monthly", "yearly"].includes(payload.plan_type)) {
+    return payload;
+  }
+
+  if (payload.status !== "active") {
+    return payload;
+  }
+
+  const nowIso = new Date().toISOString();
+
+  const { data: priorActive } = await adminClient
+    .from("subscriptions")
+    .select("stripe_subscription_id, current_period_end")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .gt("current_period_end", nowIso)
+    .neq("stripe_subscription_id", payload.stripe_subscription_id)
+    .order("current_period_end", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let normalizedStart = priorActive?.current_period_end || payload.current_period_start;
+  if (!normalizedStart || Number.isNaN(new Date(normalizedStart).getTime())) {
+    normalizedStart = nowIso;
+  }
+
+  const normalizedEnd = addPlanDurationFromIso(normalizedStart, payload.plan_type);
+  if (!normalizedEnd) {
+    return payload;
+  }
+
+  const providerEndMs = new Date(payload.current_period_end || "").getTime();
+  const normalizedEndMs = new Date(normalizedEnd).getTime();
+
+  const resolvedEnd =
+    Number.isFinite(providerEndMs) && providerEndMs > normalizedEndMs
+      ? new Date(providerEndMs).toISOString()
+      : normalizedEnd;
+
+  return {
+    ...payload,
+    current_period_start: normalizedStart,
+    current_period_end: resolvedEnd
+  };
+}
+
 export async function upsertSubscriptionFromRazorpay({
   adminClient,
   razorpaySubscription,
@@ -101,9 +167,15 @@ export async function upsertSubscriptionFromRazorpay({
     updated_at: new Date().toISOString()
   };
 
+  const normalizedPayload = await normalizeActiveEntitlementPeriod({
+    adminClient,
+    payload,
+    userId: resolvedUserId
+  });
+
   const { data, error } = await adminClient
     .from("subscriptions")
-    .upsert(payload, { onConflict: "stripe_subscription_id" })
+    .upsert(normalizedPayload, { onConflict: "stripe_subscription_id" })
     .select("id")
     .single();
 
