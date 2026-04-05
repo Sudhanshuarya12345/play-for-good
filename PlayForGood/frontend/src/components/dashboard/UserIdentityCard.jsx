@@ -24,10 +24,12 @@ function formatShortId(value) {
   return `${value.slice(0, 8)}...${value.slice(-4)}`;
 }
 
-export default function UserIdentityCard({ profile, user, context = "subscriber" }) {
+export default function UserIdentityCard({ profile, user, context = "subscriber", subscriptionStatus = "inactive" }) {
   const isAdmin = profile?.role === "admin";
-  const accountTypeLabel = isAdmin ? "Admin" : "Subscriber";
-  const dashboardLabel = context === "admin" ? "Admin Console" : "Subscriber Console";
+  const isActiveSubscriber = subscriptionStatus === "active";
+  const accountTypeLabel = isAdmin ? "Admin" : isActiveSubscriber ? "Subscriber" : "Normal User";
+  const dashboardLabel =
+    context === "admin" ? "Admin Console" : isActiveSubscriber ? "Subscriber Console" : "User Console";
   const displayName = getDisplayName(profile, user);
   const email = profile?.email || user?.email || "-";
 
@@ -38,7 +40,9 @@ export default function UserIdentityCard({ profile, user, context = "subscriber"
 
   const badgeClass = isAdmin
     ? "border-neon/40 bg-neon/15 text-neonSoft"
-    : "border-emerald-300/25 bg-emerald-500/10 text-emerald-300";
+    : isActiveSubscriber
+      ? "border-emerald-300/25 bg-emerald-500/10 text-emerald-300"
+      : "border-cyan-300/25 bg-cyan-500/10 text-cyan-200";
 
   return (
     <section className={`glass rounded-2xl border p-5 ${toneClass}`}>

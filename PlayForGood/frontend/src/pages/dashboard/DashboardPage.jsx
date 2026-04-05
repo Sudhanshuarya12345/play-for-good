@@ -108,7 +108,12 @@ export default function DashboardPage() {
         transition={{ duration: 0.45, delay: 0.15 }}
         className="mt-6"
       >
-        <UserIdentityCard profile={profile} user={user} context="subscriber" />
+        <UserIdentityCard
+          profile={profile}
+          user={user}
+          context="subscriber"
+          subscriptionStatus={subscription?.status || "inactive"}
+        />
       </MotionSection>
 
       <MotionSection 
