@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { apiRequest } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
+import UserIdentityCard from "../../components/dashboard/UserIdentityCard";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -24,8 +25,12 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
 };
 
+const MotionDiv = motion.div;
+const MotionSection = motion.section;
+const MotionArticle = motion.article;
+
 export default function DashboardPage() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [subscription, setSubscription] = useState(null);
   const [scores, setScores] = useState([]);
   const [winnings, setWinnings] = useState([]);
@@ -90,21 +95,30 @@ export default function DashboardPage() {
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-neon/10 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[50%] bg-accent/10 blur-[150px] rounded-full pointer-events-none" />
 
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+      <MotionDiv initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         <h1 className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-neon to-accent drop-shadow-sm">
           Subscriber Dashboard
         </h1>
         {error && <p className="mt-3 text-sm text-danger bg-danger/10 p-3 rounded-lg border border-danger/20">{error}</p>}
-      </motion.div>
+      </MotionDiv>
 
-      <motion.section 
+      <MotionSection
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: 0.15 }}
+        className="mt-6"
+      >
+        <UserIdentityCard profile={profile} user={user} context="subscriber" />
+      </MotionSection>
+
+      <MotionSection 
         variants={containerVariants} 
         initial="hidden" 
         animate="show" 
         className="mt-10 grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
       >
         {statCards.map((stat, idx) => (
-          <motion.article 
+          <MotionArticle 
             key={idx} 
             variants={itemVariants}
             whileHover={{ y: -5, scale: 1.02 }}
@@ -116,11 +130,11 @@ export default function DashboardPage() {
             <p className={`mt-3 text-2xl font-bold tracking-tight ${stat.highlight ? 'text-neon' : 'text-white'}`}>
               {stat.value}
             </p>
-          </motion.article>
+          </MotionArticle>
         ))}
-      </motion.section>
+      </MotionSection>
 
-      <motion.section 
+      <MotionSection 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.6 }}
@@ -130,19 +144,19 @@ export default function DashboardPage() {
           <span className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-accent/20 text-accent">ℹ</span>
           <span>Participation summary: entered <strong className="text-white">{participation.drawsEntered}</strong> draw(s), won <strong className="text-white">{participation.winsCount}</strong> time(s), last draw entered <strong className="text-white">{participation.lastEnteredDrawMonth || "Never"}</strong>.</span>
         </p>
-      </motion.section>
+      </MotionSection>
 
-      <motion.section 
+      <MotionSection 
         variants={containerVariants} 
         initial="hidden" 
         animate="show" 
         className="mt-10 flex flex-wrap gap-4"
       >
-        <motion.div variants={itemVariants}>
+        <MotionDiv variants={itemVariants}>
           <Link to="/dashboard/scores" className="inline-flex rounded-xl bg-neon hover:bg-neon/90 hover:scale-105 transition-all text-black px-6 py-3 text-sm font-bold shadow-[0_0_20px_rgba(30,167,255,0.4)]">
             Manage Scores
           </Link>
-        </motion.div>
+        </MotionDiv>
         
         {[
           { label: "Subscription", path: "/dashboard/subscription" },
@@ -150,13 +164,13 @@ export default function DashboardPage() {
           { label: "Donations", path: "/dashboard/donations" },
           { label: "Winnings", path: "/dashboard/winnings" }
         ].map((btn, idx) => (
-          <motion.div variants={itemVariants} key={idx}>
+          <MotionDiv variants={itemVariants} key={idx}>
             <Link to={btn.path} className="inline-flex rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 backdrop-blur-sm px-6 py-3 text-sm transition-all focus:ring-2 focus:ring-neon/50">
               {btn.label}
             </Link>
-          </motion.div>
+          </MotionDiv>
         ))}
-      </motion.section>
+      </MotionSection>
     </main>
   );
 }

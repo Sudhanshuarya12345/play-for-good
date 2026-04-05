@@ -1,8 +1,11 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { apiRequest } from "../../lib/api";
+import { useAuth } from "../../context/AuthContext";
+import UserIdentityCard from "../../components/dashboard/UserIdentityCard";
 
 export default function AdminOverviewPage() {
+  const { user, profile } = useAuth();
   const [overview, setOverview] = useState(null);
   const [error, setError] = useState("");
 
@@ -23,6 +26,10 @@ export default function AdminOverviewPage() {
       <p className="mt-2 text-sm text-slate-300">Control users, draws, charity content, and payout lifecycle.</p>
 
       {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
+
+      <section className="mt-6">
+        <UserIdentityCard profile={profile} user={user} context="admin" />
+      </section>
 
       <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <article className="glass rounded-xl p-4">

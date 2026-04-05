@@ -3,7 +3,9 @@ export async function getActiveSubscription({ adminClient, userId }) {
 
   const { data, error } = await adminClient
     .from("subscriptions")
-    .select("id, status, plan_type, current_period_end")
+    .select(
+      "id, stripe_subscription_id, status, plan_type, current_period_start, current_period_end, cancel_at_period_end, updated_at"
+    )
     .eq("user_id", userId)
     .eq("status", "active")
     .gt("current_period_end", nowIso)
