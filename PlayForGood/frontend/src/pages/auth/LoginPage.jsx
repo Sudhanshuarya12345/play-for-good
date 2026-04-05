@@ -2,6 +2,20 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
+function normalizeLoginError(message) {
+  const value = String(message || "").trim();
+
+  if (!value) {
+    return "Unable to login right now. Please try again.";
+  }
+
+  if (value.toLowerCase().includes("invalid login payload")) {
+    return "Please enter a valid email and password (minimum 8 characters).";
+  }
+
+  return value;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,15 +31,26 @@ export default function LoginPage() {
 
   async function onSubmit(event) {
     event.preventDefault();
-    setLoading(true);
     setError("");
+
+    if (!email || !email.includes("@")) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    if (!password || password.length < 8) {
+      setError("Please enter a password with at least 8 characters.");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       await login(email, password);
       const target = location.state?.from || "/dashboard";
       navigate(target, { replace: true });
     } catch (submitError) {
-      setError(submitError.message || "Unable to login");
+      setError(normalizeLoginError(submitError.message || "Unable to login"));
     } finally {
       setLoading(false);
     }
@@ -52,6 +77,7 @@ export default function LoginPage() {
           className="mt-1 w-full rounded-lg border border-cyan-200/20 bg-slate-950/40 px-3 py-2"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
+          minLength={8}
           required
         />
 
