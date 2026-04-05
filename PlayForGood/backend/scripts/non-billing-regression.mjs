@@ -1,4 +1,11 @@
+import { config } from "dotenv";
+
+config();
+
 const baseUrl = process.env.API_BASE_URL || "http://localhost:4000";
+const razorpayEnabled = ["1", "true", "yes", "on"].includes(
+  String(process.env.RAZORPAY_ENABLED || "").trim().toLowerCase()
+);
 
 const results = [];
 
@@ -379,7 +386,7 @@ async function run() {
   const razorpayWebhookDisabled = await request("POST", "/api/webhooks/razorpay", {
     body: {}
   });
-  addResult("POST /api/webhooks/razorpay", razorpayWebhookDisabled, 200);
+  addResult("POST /api/webhooks/razorpay", razorpayWebhookDisabled, razorpayEnabled ? 400 : 200);
 
   const stripeWebhookDeprecated = await request("POST", "/api/webhooks/stripe", {
     body: {}

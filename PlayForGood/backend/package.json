@@ -7,6 +7,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "seed:demo": "node scripts/seed-demo-users.mjs",
+    "maintenance:fix-subscription-period": "node scripts/normalize-subscription-period.mjs",
     "db:apply:remote": "node scripts/apply-schema-remote.mjs",
     "test:nonbilling": "node scripts/non-billing-regression.mjs",
     "test:nonstripe": "node scripts/non-billing-regression.mjs",
