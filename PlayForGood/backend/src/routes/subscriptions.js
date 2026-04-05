@@ -133,15 +133,44 @@ router.post("/create-portal-session", requireAuth, async (req, res) => {
 router.get("/status", requireAuth, async (req, res) => {
   try {
     const adminClient = getSupabaseAdminClient();
-    const { data: latest } = await adminClient
+    let { data: latest } = await adminClient
       .from("subscriptions")
-      .select("id, status, plan_type, current_period_start, current_period_end, cancel_at_period_end")
+      .select("id, stripe_subscription_id, status, plan_type, current_period_start, current_period_end, cancel_at_period_end")
       .eq("user_id", req.auth.user.id)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    const active = await getActiveSubscription({ adminClient, userId: req.auth.user.id });
+    let active = await getActiveSubscription({ adminClient, userId: req.auth.user.id });
+
+    // Fallback sync: if webhook update is delayed/missed, refresh latest subscription from Razorpay.
+    if (!active && latest?.stripe_subscription_id && isRazorpayEnabled()) {
+      try {
+        const razorpay = getRazorpayClient();
+        const liveSubscription = await razorpay.subscriptions.fetch(latest.stripe_subscription_id);
+
+        await upsertSubscriptionFromRazorpay({
+          adminClient,
+          razorpaySubscription: liveSubscription,
+          userId: req.auth.user.id,
+          razorpayCustomerId: liveSubscription.customer_id || null
+        });
+
+        const { data: refreshedLatest } = await adminClient
+          .from("subscriptions")
+          .select("id, stripe_subscription_id, status, plan_type, current_period_start, current_period_end, cancel_at_period_end")
+          .eq("user_id", req.auth.user.id)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        latest = refreshedLatest || latest;
+        active = await getActiveSubscription({ adminClient, userId: req.auth.user.id });
+      } catch (_syncError) {
+        // Keep response non-blocking when provider sync is temporarily unavailable.
+      }
+    }
+
     const latestForDisplay = active || latest || null;
 
     return ok(res, {
