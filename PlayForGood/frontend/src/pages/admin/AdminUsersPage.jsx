@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../../lib/api";
 
 const SUBSCRIPTION_STATUSES = ["inactive", "active", "canceled", "past_due", "unpaid", "incomplete", "lapsed"];
+const ADMIN_USERS_AUTO_REFRESH_MS = 8000;
 
 function pad2(value) {
   return String(value).padStart(2, "0");
@@ -82,9 +83,18 @@ export default function AdminUsersPage() {
   const [savingSubscriptionUserId, setSavingSubscriptionUserId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async ({ silentErrors = false, auto = false } = {}) => {
     try {
+      if (auto) {
+        setIsAutoRefreshing(true);
+      }
+
+      if (!silentErrors) {
+        setError("");
+      }
+
       const [usersData, charitiesData] = await Promise.all([
         apiRequest("/admin/users", { method: "GET" }),
         apiRequest("/admin/charities", { method: "GET" })
@@ -93,13 +103,61 @@ export default function AdminUsersPage() {
       setRows(usersData.items || []);
       setCharities(charitiesData.items || []);
     } catch (loadError) {
-      setError(loadError.message || "Unable to load admin user management data");
+      if (!silentErrors) {
+        setError(loadError.message || "Unable to load admin user management data");
+      }
+    } finally {
+      if (auto) {
+        setIsAutoRefreshing(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  const isEditingOrSaving =
+    Boolean(profileEditUserId) ||
+    Boolean(subscriptionEditUserId) ||
+    Boolean(savingProfileUserId) ||
+    Boolean(savingSubscriptionUserId);
+
+  useEffect(() => {
+    if (isEditingOrSaving) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadData({ silentErrors: true, auto: true });
+    }, ADMIN_USERS_AUTO_REFRESH_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isEditingOrSaving, loadData]);
+
+  useEffect(() => {
+    function refreshOnReturn() {
+      if (document.visibilityState && document.visibilityState !== "visible") {
+        return;
+      }
+
+      if (isEditingOrSaving) {
+        return;
+      }
+
+      void loadData({ silentErrors: true, auto: true });
+    }
+
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+
+    return () => {
+      window.removeEventListener("focus", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
+  }, [isEditingOrSaving, loadData]);
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -216,6 +274,9 @@ export default function AdminUsersPage() {
         >
           Refresh
         </button>
+        <p className="text-xs text-slate-400">
+          Auto-refresh: every 8s when not editing {isAutoRefreshing ? "(syncing...)" : ""}
+        </p>
       </div>
 
       <section className="mt-6 space-y-3">

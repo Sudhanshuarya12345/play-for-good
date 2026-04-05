@@ -21,6 +21,42 @@ const subscriptionOverrideSchema = z.object({
   cancelAtPeriodEnd: z.boolean().default(false)
 });
 
+function toMillis(value) {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function pickSubscriptionForDisplay(subscriptions, nowMillis) {
+  if (!subscriptions.length) {
+    return null;
+  }
+
+  const activeCurrent = subscriptions
+    .filter((subscription) => {
+      if (subscription.status !== "active") {
+        return false;
+      }
+
+      return toMillis(subscription.current_period_end) > nowMillis;
+    })
+    .sort((left, right) => toMillis(right.current_period_end) - toMillis(left.current_period_end));
+
+  if (activeCurrent.length) {
+    return activeCurrent[0];
+  }
+
+  const activeWithoutPeriod = subscriptions.find((subscription) => subscription.status === "active");
+  if (activeWithoutPeriod) {
+    return activeWithoutPeriod;
+  }
+
+  return subscriptions[0];
+}
+
 router.get("/", requireAdmin, async (_req, res) => {
   try {
     const adminClient = getSupabaseAdminClient();
@@ -49,16 +85,20 @@ router.get("/", requireAdmin, async (_req, res) => {
       return badRequest(res, subscriptionsError.message);
     }
 
-    const latestByUser = new Map();
+    const subscriptionsByUser = new Map();
     for (const subscription of subscriptions || []) {
-      if (!latestByUser.has(subscription.user_id)) {
-        latestByUser.set(subscription.user_id, subscription);
+      if (!subscriptionsByUser.has(subscription.user_id)) {
+        subscriptionsByUser.set(subscription.user_id, []);
       }
+
+      subscriptionsByUser.get(subscription.user_id).push(subscription);
     }
+
+    const nowMillis = Date.now();
 
     const items = profiles.map((profile) => ({
       ...profile,
-      latest_subscription: latestByUser.get(profile.id) || null
+      latest_subscription: pickSubscriptionForDisplay(subscriptionsByUser.get(profile.id) || [], nowMillis)
     }));
 
     return ok(res, { items });
